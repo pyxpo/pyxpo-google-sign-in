@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyxpo-google-sign-in"
+dynamic = ["version"]
+description = "Sign in with Google for pyxpo apps: Credential Manager on Android, GoogleSignIn on iOS, Google Identity Services on the web"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Vishal Chaubey" }]
+keywords = ["pyxpo", "pyxpo-module", "mobile", "android", "ios", "google", "sign-in", "oauth", "credential-manager", "id-token"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: Android",
+    "Operating System :: iOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: User Interfaces",
+    "Typing :: Typed",
+]
+requires-python = ">=3.9"
+dependencies = ["pyxpo>=0.1.0a9,<0.2"]
+
+[project.urls]
+Homepage = "https://github.com/pyxpo/pyxpo-google-sign-in"
+Documentation = "https://github.com/pyxpo/pyxpo-google-sign-in/blob/main/README.md"
+Changelog = "https://github.com/pyxpo/pyxpo-google-sign-in/blob/main/CHANGELOG.md"
+Source = "https://github.com/pyxpo/pyxpo-google-sign-in"
+Issues = "https://github.com/pyxpo/pyxpo-google-sign-in/issues"
+
+# How `pyxpo build` finds this module: the entry point name is the module name apps list in
+# `[tool.pyxpo] modules`, its value the import package holding pyxpo-module.json.
+[project.entry-points."pyxpo.modules"]
+google-sign-in = "pyxpo_google_sign_in"
+
+[tool.setuptools]
+packages = ["pyxpo_google_sign_in"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pyxpo_google_sign_in.__version__" }
+
+[tool.setuptools.package-data]
+pyxpo_google_sign_in = ["pyxpo-module.json", "py.typed", "ios/**/*", "android/**/*", "web.js"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__", "*.pyc", ".DS_Store"]
