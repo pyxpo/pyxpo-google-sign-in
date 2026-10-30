@@ -1,1 +1,10 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Shows Google's consent screen for extra scopes and the server auth code, then returns its result. -->
+        <activity
+            android:name="dev.pyxpo.modules.googlesignin.GoogleSignInAuthActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>

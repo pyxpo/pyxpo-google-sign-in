@@ -1,28 +1,35 @@
 {
   "schemaVersion": 1,
-  "nativeContract": 1,
+  "nativeContract": 2,
   "name": "google-sign-in",
   "native": "GoogleSignIn",
   "ios": {
-    "classes": ["GoogleSignInModule"],
+    "classes": [
+      "GoogleSignInModule"
+    ],
     "swiftPackages": [
       {
         "name": "GoogleSignIn",
         "url": "https://github.com/google/GoogleSignIn-iOS",
         "version": "8.0.0",
-        "products": ["GoogleSignIn"],
+        "products": [
+          "GoogleSignIn"
+        ],
         "platformFilter": "iOS"
       }
     ]
   },
   "android": {
     "namespace": "dev.pyxpo.modules.googlesignin",
-    "classes": ["dev.pyxpo.modules.googlesignin.GoogleSignInModule"],
+    "classes": [
+      "dev.pyxpo.modules.googlesignin.GoogleSignInModule"
+    ],
     "minSdk": 24,
     "dependencies": [
-      "androidx.credentials:credentials:1.3.0",
-      "androidx.credentials:credentials-play-services-auth:1.3.0",
-      "com.google.android.libraries.identity.googleid:googleid:1.1.1"
+      "androidx.credentials:credentials:1.5.0",
+      "androidx.credentials:credentials-play-services-auth:1.5.0",
+      "com.google.android.libraries.identity.googleid:googleid:1.1.1",
+      "com.google.android.gms:play-services-auth:21.4.0"
     ]
   }
 }

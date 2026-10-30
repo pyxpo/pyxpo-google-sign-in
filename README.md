@@ -22,7 +22,14 @@ if res["type"] == "success":
 - **One ID token for every platform.** Its audience is your web client ID, so one server check covers Android,
   iOS and the web.
 - **Native account pickers:** the Credential Manager bottom sheet on Android, Google's sheet on iOS.
-- **Clear outcomes:** `{"type": "success"}` or `{"type": "cancelled"}`, and `GoogleSignInError.code` for the rest.
+- **Clear outcomes:** `{"type": "success"}`, `{"type": "cancelled"}` or `{"type": "noSavedCredentialFound"}`, and
+  `GoogleSignInError.code` for the rest.
+- **Silent sign-in at app start** with `sign_in_silently()`, no UI when the user signed in before.
+- **More scopes later:** `add_scopes()` shows Google's consent screen only for what is new; `get_tokens()` gives
+  a fresh access token for Google APIs (Drive, Calendar, ...).
+- **Backend access:** `offline_access=True` returns a `serverAuthCode` on Android and iOS.
+- **Google's own button:** `GoogleSigninButton` is the native `SignInButton` / `GIDSignInButton`.
+- **Disconnect:** `revoke_access()` removes every grant, for "Disconnect Google" and account deletion.
 - **Config plugin** for the iOS URL scheme, so you never edit Info.plist.
 - **Works on the web and the desktop** with Google Identity Services, so you can develop without a phone.
 - **camelCase too:** `GoogleSignin.signIn()`, `webClientId=...`.
@@ -99,6 +106,37 @@ async def sign_in_with_google():
     return await api.post("/auth/google", {"idToken": res["data"]["idToken"]})
 ```
 
+Sign the previous user back in at app start, without UI:
+
+```python
+res = await GoogleSignin.sign_in_silently()
+if res["type"] == "success":
+    user = res["data"]["user"]
+else:                                  # "noSavedCredentialFound": show the sign-in screen
+    ...
+```
+
+Google's branded button:
+
+```python
+from pyxpo.module_api import spawn
+from pyxpo_google_sign_in import GoogleSigninButton
+
+GoogleSigninButton(size=GoogleSigninButton.Size.WIDE, color=GoogleSigninButton.Color.DARK,
+                   on_press=lambda _: spawn(sign_in_with_google()))
+```
+
+Call a Google API with more scopes:
+
+```python
+DRIVE = "https://www.googleapis.com/auth/drive.readonly"
+res = await GoogleSignin.add_scopes([DRIVE])        # consent screen once; None when nobody is signed in
+if res and res["type"] == "success":
+    tokens = await GoogleSignin.get_tokens()       # {"idToken", "accessToken"}
+    files = await fetch("https://www.googleapis.com/drive/v3/files",
+                        headers={"Authorization": "Bearer " + tokens["accessToken"]})
+```
+
 Verify the token on the server: signature against Google's keys, `iss` is `https://accounts.google.com`, `aud` is
 your **web** client ID, `exp` in the future, `email_verified` true.
 
@@ -106,16 +144,37 @@ your **web** client ID, `exp` in the future, `email_verified` true.
 
 | Name | Returns | Notes |
 | --- | --- | --- |
-| `configure(web_client_id, ios_client_id=None, scopes=None, offline_access=False, hosted_domain=None)` | `None` | Call once at startup. Validates the client IDs. |
+| `configure(web_client_id, ios_client_id=None, scopes=None, offline_access=False, hosted_domain=None, force_code_for_refresh_token=False, profile_image_size=120, openid_realm=None, account_name=None)` | `None` | Call once at startup. Validates the client IDs. |
 | `await has_play_services(show_play_services_update_dialog=True)` | `True` | Android only checks; raises `PLAY_SERVICES_NOT_AVAILABLE`. iOS and the web: `True`. |
-| `await sign_in()` | response | `{"type": "success", "data": {...}}` or `{"type": "cancelled", "data": None}`. |
+| `await sign_in(login_hint=None, nonce=None)` | response | `success` or `cancelled`. Also takes `{"loginHint": ..., "nonce": ...}`. |
+| `await sign_in_silently()` | response | `success` or `noSavedCredentialFound`. No UI. |
+| `await add_scopes(scopes)` | response or `None` | `None` when nobody is signed in. |
+| `await get_tokens()` | `{"idToken", "accessToken"}` | Refreshes expired tokens. Raises `SIGN_IN_REQUIRED` when nobody is signed in. |
+| `await get_current_user()` | `data` or `None` | The signed-in user, without a network call. |
+| `await has_previous_sign_in()` | `bool` | True when `sign_in_silently()` can work. |
+| `await clear_cached_access_token(token)` | `None` | Android: drop a token your API rejected. iOS: no-op. |
+| `await revoke_access()` | `None` | Removes every grant and signs out. |
 | `await sign_out()` | `None` | Clears the remembered account, so the next sign-in shows the picker. |
-| `is_success_response(r)`, `is_cancelled_response(r)` | `bool` | |
+| `GoogleSigninButton(size, color, disabled=False, on_press=None, style=None)` | view | `Size.STANDARD/WIDE/ICON`, `Color.LIGHT/DARK`. Height 48. |
+| `is_success_response`, `is_cancelled_response`, `is_no_saved_credential_found_response` | `bool` | |
 | `is_error_with_code(e)` | `bool` | True for `GoogleSignInError`. |
 | `GoogleSignin` | namespace | `GoogleSignin.signIn()` and friends, React Native style. |
 
-`data` holds `idToken`, `serverAuthCode` (iOS with `offline_access`, else `None`), `scopes` and `user`:
-`id`, `email`, `name`, `givenName`, `familyName`, `photo`. On Android `id` is the account email.
+`data` holds `idToken`, `serverAuthCode` (with `offline_access`, else `None`), `scopes` and `user`: `id`,
+`email`, `name`, `givenName`, `familyName`, `photo`. `id` is Google's stable account ID (the token's `sub`).
+
+### Platform notes
+
+| | Android | iOS | Web and desktop |
+| --- | --- | --- | --- |
+| Sign-in UI | Credential Manager sheet | GoogleSignIn sheet | Google button in a small sheet |
+| `nonce` | yes | no (SDK has none) | yes |
+| `login_hint` | no | yes | yes |
+| `serverAuthCode` | yes | yes | no |
+| `add_scopes`, `get_tokens` | AuthorizationClient | GoogleSignIn | GIS token client |
+
+Differences from React Native: `get_current_user()` and `has_previous_sign_in()` are coroutines. This package
+never writes tokens to disk; on Android the ID token lives in memory for the app run.
 
 ## Errors
 
@@ -125,12 +184,14 @@ your **web** client ID, `exp` in the future, `email_verified` true.
 | --- | --- | --- |
 | `IN_PROGRESS` | `sign_in()` while another is open | Ignore the second tap. |
 | `PLAY_SERVICES_NOT_AVAILABLE` | Android without current Google Play services | Ask the user to update it. |
-| `SIGN_IN_REQUIRED` | Android has no Google account to offer | Ask the user to add one in Settings. |
+| `SIGN_IN_REQUIRED` | no Google account on the device, or `get_tokens()` with nobody signed in | Show the sign-in screen. |
+| `NULL_PRESENTER` | iOS has no view controller to show the sheet from | Call after the first screen is on screen. |
 | `NOT_CONFIGURED` | no `configure()`, or no `ios_client_id` on iOS | Call `configure` at startup. |
 | `NO_ID_TOKEN` | Google returned no ID token | Check `web_client_id` is the **Web application** client. |
 | `FAILED` | anything else; the message comes from the SDK | Show a generic error, log the message. |
 
-A cancelled picker is not an error: `sign_in()` returns `{"type": "cancelled"}`.
+A cancelled picker or consent screen is not an error: `sign_in()` and `add_scopes()` return
+`{"type": "cancelled"}`.
 
 ## Testing
 
@@ -143,7 +204,7 @@ import pyxpo_google_sign_in as G
 def test_sign_in():
     G.configure(web_client_id="1-w.apps.googleusercontent.com")
     with FakeBridge("android") as fb:
-        fb.on("GoogleSignIn", "signIn", lambda cfg: {"type": "success", "data": {"idToken": "t", "user": {}}})
+        fb.on("GoogleSignIn", "signIn", lambda cfg, opts: {"type": "success", "data": {"idToken": "t", "user": {}}})
         assert asyncio.run(G.sign_in())["data"]["idToken"] == "t"
 ```
 
@@ -153,6 +214,8 @@ def test_sign_in():
   the SHA-1 of the certificate that signed this build. Add the debug and the release SHA-1.
 - **iOS: the app stops at sign-in.** The URL scheme is missing. Add the plugin with `iosClientId` and rebuild.
 - **Web: "The given origin is not allowed".** Add the page origin to the web client's Authorized JavaScript origins.
+- **Android: the consent screen never shows for `add_scopes()`.** Enable the API (Drive, Calendar, ...) in the
+  same Google Cloud project as the OAuth clients.
 - **`NO_ID_TOKEN`.** `web_client_id` is an Android or iOS client. Use the Web application client.
 
 ## License
